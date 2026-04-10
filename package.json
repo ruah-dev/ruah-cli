@@ -1,0 +1,50 @@
+{
+	"name": "@ruah-dev/cli",
+	"version": "1.0.0",
+	"description": "CLI for ruah — multi-agent orchestration. Workspace isolation, file locking, DAG scheduling, merge coordination.",
+	"type": "module",
+	"bin": {
+		"ruah": "bin/ruah.js"
+	},
+	"files": [
+		"bin/",
+		"LICENSE",
+		"README.md"
+	],
+	"scripts": {
+		"test": "node bin/ruah.js --version",
+		"prepublishOnly": "npm test"
+	},
+	"keywords": [
+		"ai",
+		"agents",
+		"orchestration",
+		"multi-agent",
+		"claude-code",
+		"codex",
+		"aider",
+		"cursor",
+		"worktree",
+		"workflow",
+		"cli"
+	],
+	"author": "ruah-dev",
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ruah-dev/ruah-cli.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ruah-dev/ruah-cli/issues"
+	},
+	"homepage": "https://github.com/ruah-dev/ruah-cli#readme",
+	"engines": {
+		"node": ">=18.0.0"
+	},
+	"dependencies": {
+		"@ruah-dev/orch": "^1.0.3"
+	}
+}
