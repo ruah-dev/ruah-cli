@@ -1,19 +1,26 @@
 {
 	"name": "@ruah-dev/cli",
-	"version": "1.0.0",
-	"description": "CLI for ruah — multi-agent orchestration. Workspace isolation, file locking, DAG scheduling, merge coordination.",
+	"version": "1.0.1",
+	"description": "CLI for ruah — multi-agent developer toolkit. Workspace isolation, file locking, DAG scheduling, merge coordination.",
 	"type": "module",
 	"bin": {
-		"ruah": "bin/ruah.js"
+		"ruah": "dist/cli.js"
 	},
 	"files": [
-		"bin/",
+		"dist/",
 		"LICENSE",
 		"README.md"
 	],
 	"scripts": {
-		"test": "node bin/ruah.js --version",
-		"prepublishOnly": "npm test"
+		"build": "tsc && chmod +x dist/cli.js",
+		"dev": "tsc --watch",
+		"pretest": "npm run build",
+		"test": "node dist/cli.js --version",
+		"lint": "biome check .",
+		"format": "biome check --write .",
+		"typecheck": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"prepublishOnly": "npm run clean && npm run build && npm test"
 	},
 	"keywords": [
 		"ai",
@@ -46,5 +53,10 @@
 	},
 	"dependencies": {
 		"@ruah-dev/orch": "^1.0.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.10",
+		"@types/node": "^25.5.2",
+		"typescript": "^6.0.2"
 	}
 }

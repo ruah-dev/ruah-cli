@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    name: Typecheck, Lint & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,11 +23,20 @@ jobs:
 
       - run: npm ci
 
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx biome check .
+
+      - name: Build
+        run: npm run build
+
       - name: Test CLI
         run: |
-          node bin/ruah.js --version
-          node bin/ruah.js --help
-          node bin/ruah.js orch --version
+          node dist/cli.js --version
+          node dist/cli.js --help
+          node dist/cli.js orch --version
 
   publish-npm:
     name: Publish to npm
@@ -46,6 +55,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
+
+      - name: Build
+        run: npm run build
 
       - name: Publish with provenance
         run: npm publish --access public --provenance

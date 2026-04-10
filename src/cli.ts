@@ -19,11 +19,24 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
+// ── Types ───────────────────────────────────────────────────────────
+
+interface PackageEntry {
+	pkg: string;
+	description: string;
+	resolve: () => string;
+}
+
+interface PackageJson {
+	version: string;
+	name?: string;
+}
+
 // ── Package registry ────────────────────────────────────────────────
 // Maps subcommand namespaces to their @ruah-dev/* package entry points.
 // Add new packages here as the ecosystem grows.
 
-const PACKAGES = {
+const PACKAGES: Record<string, PackageEntry> = {
 	orch: {
 		pkg: "@ruah-dev/orch",
 		description: "Multi-agent orchestration",
@@ -56,18 +69,28 @@ const ORCH_SHORTCUTS = new Set([
 
 // ── Version ─────────────────────────────────────────────────────────
 
-function getVersion() {
+function getVersion(): string {
 	try {
-		const pkg = require(resolve(__dirname, "..", "package.json"));
+		const pkg = require(resolve(__dirname, "..", "package.json")) as PackageJson;
 		return pkg.version;
 	} catch {
 		return "unknown";
 	}
 }
 
+function getPackageVersion(entry: PackageEntry): string | null {
+	try {
+		const pkgPath = require.resolve(`${entry.pkg}/package.json`);
+		const pkg = require(pkgPath) as PackageJson;
+		return pkg.version;
+	} catch {
+		return null;
+	}
+}
+
 // ── Help ────────────────────────────────────────────────────────────
 
-function printHelp() {
+function printHelp(): void {
 	const version = getVersion();
 	console.log(`
   ruah v${version} — multi-agent developer toolkit
@@ -103,13 +126,11 @@ function printHelp() {
   Packages:
     @ruah-dev/cli   v${version}  (this CLI)`);
 
-	// Show installed package versions
-	for (const [name, entry] of Object.entries(PACKAGES)) {
-		try {
-			const pkgJson = require.resolve(`${entry.pkg}/package.json`);
-			const pkg = require(pkgJson);
-			console.log(`    ${entry.pkg}  v${pkg.version}  ${entry.description}`);
-		} catch {
+	for (const entry of Object.values(PACKAGES)) {
+		const ver = getPackageVersion(entry);
+		if (ver) {
+			console.log(`    ${entry.pkg}  v${ver}  ${entry.description}`);
+		} else {
 			console.log(`    ${entry.pkg}  (not installed)  ${entry.description}`);
 		}
 	}
@@ -117,72 +138,80 @@ function printHelp() {
 	console.log();
 }
 
+// ── Version output ──────────────────────────────────────────────────
+
+function printVersion(): void {
+	const version = getVersion();
+	console.log(`ruah v${version}`);
+
+	for (const [name, entry] of Object.entries(PACKAGES)) {
+		const ver = getPackageVersion(entry);
+		if (ver) {
+			console.log(`  ${name}: v${ver}`);
+		} else {
+			console.log(`  ${name}: not installed`);
+		}
+	}
+}
+
 // ── Delegate to a package CLI ───────────────────────────────────────
 
-function delegate(entry, args) {
+function delegate(entry: PackageEntry, args: string[]): void {
 	try {
 		const cli = entry.resolve();
 		execFileSync(process.execPath, [cli, ...args], {
 			stdio: "inherit",
 			env: process.env,
 		});
-	} catch (err) {
-		if (err.status != null) {
-			process.exit(err.status);
+	} catch (err: unknown) {
+		const error = err as { status?: number; message?: string };
+		if (error.status != null) {
+			process.exit(error.status);
 		}
-		console.error(`ruah: failed to run ${entry.pkg}: ${err.message}`);
+		console.error(`ruah: failed to run ${entry.pkg}: ${error.message ?? "unknown error"}`);
 		process.exit(1);
 	}
 }
 
 // ── Main ────────────────────────────────────────────────────────────
 
-const args = process.argv.slice(2);
+function main(): void {
+	const args = process.argv.slice(2);
 
-// No args or help flag
-if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
-	printHelp();
-	process.exit(0);
-}
+	// No args or help flag
+	if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+		printHelp();
+		process.exit(0);
+	}
 
-// Version flag
-if (args[0] === "--version" || args[0] === "-v") {
-	const version = getVersion();
+	// Version flag
+	if (args[0] === "--version" || args[0] === "-v") {
+		printVersion();
+		process.exit(0);
+	}
 
-	console.log(`ruah v${version}`);
+	const command = args[0];
 
-	for (const [name, entry] of Object.entries(PACKAGES)) {
-		try {
-			const pkgJson = require.resolve(`${entry.pkg}/package.json`);
-			const pkg = require(pkgJson);
-			console.log(`  ${name}: v${pkg.version}`);
-		} catch {
-			console.log(`  ${name}: not installed`);
+	// Explicit namespace: ruah orch <...>
+	if (command in PACKAGES) {
+		delegate(PACKAGES[command], args.slice(1));
+	}
+	// Shortcut: ruah task <...> → ruah orch task <...>
+	else if (ORCH_SHORTCUTS.has(command)) {
+		delegate(PACKAGES.orch, args);
+	}
+	// Unknown command
+	else {
+		console.error(`ruah: unknown command '${command}'`);
+		console.error();
+		console.error("Available namespaces:");
+		for (const [name, entry] of Object.entries(PACKAGES)) {
+			console.error(`  ${name}  ${entry.description}`);
 		}
+		console.error();
+		console.error("Run 'ruah --help' for usage.");
+		process.exit(1);
 	}
-
-	process.exit(0);
 }
 
-const command = args[0];
-
-// Explicit namespace: ruah orch <...>
-if (PACKAGES[command]) {
-	delegate(PACKAGES[command], args.slice(1));
-}
-// Shortcut: ruah task <...> → ruah orch task <...>
-else if (ORCH_SHORTCUTS.has(command)) {
-	delegate(PACKAGES.orch, args);
-}
-// Unknown command
-else {
-	console.error(`ruah: unknown command '${command}'`);
-	console.error();
-	console.error("Available namespaces:");
-	for (const [name, entry] of Object.entries(PACKAGES)) {
-		console.error(`  ${name}  ${entry.description}`);
-	}
-	console.error();
-	console.error("Run 'ruah --help' for usage.");
-	process.exit(1);
-}
+main();
