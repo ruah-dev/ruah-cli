@@ -61,6 +61,11 @@ const KNOWN_PACKAGES: Record<string, PackageEntry> = {
 		description: "Multi-agent orchestration",
 		defaultBin: "dist/cli.js",
 	},
+	conv: {
+		pkg: "@ruah-dev/conv",
+		description: "Convert API specs to agent-ready tool surfaces",
+		defaultBin: "dist/cli.js",
+	},
 };
 
 // ── Orch shortcuts — these commands delegate directly to orch ────────
