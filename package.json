@@ -12,14 +12,15 @@
 		"README.md"
 	],
 	"scripts": {
-		"build": "tsc && chmod +x dist/cli.js",
+		"build": "tsc && node dist/postbuild.js",
 		"dev": "tsc --watch",
 		"pretest": "npm run build",
-		"test": "node dist/cli.js --version",
+		"test": "node dist/verify.js",
 		"lint": "biome check .",
 		"format": "biome check --write .",
 		"typecheck": "tsc --noEmit",
 		"clean": "rm -rf dist",
+		"verify": "npm run typecheck && npm run lint && npm test",
 		"prepublishOnly": "npm run clean && npm run build && npm test"
 	},
 	"keywords": [
@@ -52,6 +53,7 @@
 		"node": ">=18.0.0"
 	},
 	"dependencies": {
+		"@ruah-dev/conv": "file:../ruah-conv",
 		"@ruah-dev/orch": "^1.0.3"
 	},
 	"devDependencies": {
