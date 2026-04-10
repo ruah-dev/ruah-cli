@@ -126,8 +126,7 @@ function getPackages(): Record<string, PackageEntry> {
 			const ns = pkgJson.ruah.namespace;
 			packages[ns] = {
 				pkg: pkgJson.name ?? `@ruah-dev/${entry.name}`,
-				description:
-					pkgJson.ruah.description ?? pkgJson.description ?? entry.name,
+				description: pkgJson.ruah.description ?? pkgJson.description ?? entry.name,
 				defaultBin: "dist/cli.js",
 			};
 		}
@@ -176,10 +175,7 @@ function getInstalledPackage(entry: PackageEntry): InstalledPackage | null {
 	}
 }
 
-function resolveBinPath(
-	packageJson: PackageJson,
-	fallbackPath: string,
-): string {
+function resolveBinPath(packageJson: PackageJson, fallbackPath: string): string {
 	if (typeof packageJson.bin === "string") {
 		return packageJson.bin;
 	}
@@ -284,9 +280,7 @@ ${namespaceLines}
 	for (const entry of Object.values(packages)) {
 		const packageVersion = getPackageVersion(entry);
 		if (packageVersion) {
-			console.log(
-				`    ${entry.pkg}  v${packageVersion}  ${entry.description}`,
-			);
+			console.log(`    ${entry.pkg}  v${packageVersion}  ${entry.description}`);
 			continue;
 		}
 
@@ -329,8 +323,7 @@ function delegate(entry: PackageEntry, args: string[]): number {
 			return execError.status;
 		}
 
-		const message =
-			error instanceof Error ? error.message : "unknown error";
+		const message = error instanceof Error ? error.message : "unknown error";
 		console.error(`ruah: failed to run ${entry.pkg}: ${message}`);
 		return 1;
 	}

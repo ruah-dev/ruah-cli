@@ -21,7 +21,8 @@ This installs the `ruah` command and pulls in all packages:
 
 ```
 @ruah-dev/cli          <- you install this
-  └── @ruah-dev/orch   <- multi-agent orchestration engine
+  ├── @ruah-dev/orch   <- multi-agent orchestration engine
+  └── @ruah-dev/conv   <- API spec conversion tools
 ```
 
 ## Usage
@@ -34,6 +35,10 @@ ruah orch task create api --files "src/api/**" --executor claude-code
 ruah task create api --files "src/api/**" --executor claude-code
 ruah workflow run .ruah/workflows/feature.md
 ruah status --json
+
+# Conversion tools
+ruah conv inspect petstore.yaml
+ruah conv generate petstore.yaml --json
 ```
 
 ## Namespaces
@@ -41,8 +46,7 @@ ruah status --json
 | Namespace | Package | Description |
 |---|---|---|
 | `orch` | [@ruah-dev/orch](https://npmjs.com/package/@ruah-dev/orch) | Multi-agent orchestration — workspace isolation, file locking, DAG merges |
-
-More namespaces coming as the ecosystem grows.
+| `conv` | [@ruah-dev/conv](https://npmjs.com/package/@ruah-dev/conv) | Convert API specs to agent-ready tool surfaces |
 
 ## Orch Shortcuts
 
@@ -79,6 +83,7 @@ ruah task done frontend && ruah task merge frontend
 ## Links
 
 - **Orchestration engine:** [@ruah-dev/orch](https://github.com/ruah-dev/ruah-orch)
+- **Conversion tools:** [@ruah-dev/conv](https://github.com/ruah-dev/ruah-conv)
 - **Issues:** [github.com/ruah-dev/ruah-cli/issues](https://github.com/ruah-dev/ruah-cli/issues)
 
 ## License

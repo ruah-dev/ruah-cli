@@ -1,6 +1,6 @@
 {
 	"name": "@ruah-dev/cli",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "CLI for ruah — multi-agent developer toolkit. Workspace isolation, file locking, DAG scheduling, merge coordination.",
 	"type": "module",
 	"bin": {
@@ -53,8 +53,8 @@
 		"node": ">=18.0.0"
 	},
 	"dependencies": {
-		"@ruah-dev/conv": "file:../ruah-conv",
-		"@ruah-dev/orch": "^1.0.3"
+		"@ruah-dev/conv": "^0.1.2",
+		"@ruah-dev/orch": "^1.0.5"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.10",
