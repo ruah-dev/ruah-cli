@@ -111,7 +111,7 @@ jobs:
         working-directory: ruah-cli
 
       - name: Publish with provenance
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --ignore-scripts
         working-directory: ruah-cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
