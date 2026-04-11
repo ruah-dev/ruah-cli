@@ -20,9 +20,12 @@ npm install -g @ruah-dev/cli
 This installs the `ruah` command and pulls in all packages:
 
 ```
-@ruah-dev/cli          <- you install this
-  ├── @ruah-dev/orch   <- multi-agent orchestration engine
-  └── @ruah-dev/conv   <- API spec conversion tools
+@ruah-dev/cli               <- primary install target, provides `ruah`
+  ├── @ruah-dev/orch-core   <- orch implementation
+  └── @ruah-dev/conv-core   <- conv implementation
+
+@ruah-dev/orch              <- thin installer, installs `ruah` + orch core
+@ruah-dev/conv              <- thin installer, installs `ruah` + conv core
 ```
 
 ## Usage
@@ -82,8 +85,9 @@ ruah task done frontend && ruah task merge frontend
 
 ## Links
 
-- **Orchestration engine:** [@ruah-dev/orch](https://github.com/ruah-dev/ruah-orch)
-- **Conversion tools:** [@ruah-dev/conv](https://github.com/ruah-dev/ruah-conv)
+- **Top-level CLI:** [@ruah-dev/cli](https://github.com/ruah-dev/ruah-cli)
+- **Orch installer:** [@ruah-dev/orch](https://github.com/ruah-dev/ruah-orch)
+- **Conv installer:** [@ruah-dev/conv](https://github.com/ruah-dev/ruah-conv)
 - **Issues:** [github.com/ruah-dev/ruah-cli/issues](https://github.com/ruah-dev/ruah-cli/issues)
 
 ## License

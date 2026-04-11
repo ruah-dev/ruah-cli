@@ -57,12 +57,12 @@ interface ExecError extends Error {
 
 const KNOWN_PACKAGES: Record<string, PackageEntry> = {
 	orch: {
-		pkg: "@ruah-dev/orch",
+		pkg: "@ruah-dev/orch-core",
 		description: "Multi-agent orchestration",
 		defaultBin: "dist/cli.js",
 	},
 	conv: {
-		pkg: "@ruah-dev/conv",
+		pkg: "@ruah-dev/conv-core",
 		description: "Convert API specs to agent-ready tool surfaces",
 		defaultBin: "dist/cli.js",
 	},
