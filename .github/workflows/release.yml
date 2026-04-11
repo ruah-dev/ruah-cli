@@ -47,10 +47,7 @@ jobs:
         working-directory: ruah-cli
 
       - name: Test CLI
-        run: |
-          node dist/cli.js --version
-          node dist/cli.js --help
-          node dist/cli.js orch --version
+        run: npm test
         working-directory: ruah-cli
 
   publish-npm:
