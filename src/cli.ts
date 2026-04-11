@@ -14,7 +14,7 @@
 //   automatically available as `ruah <namespace> <command>`.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -369,6 +369,10 @@ export function run(argv: string[] = process.argv.slice(2)): number {
 	return 1;
 }
 
-if (resolve(process.argv[1] ?? "") === __filename) {
-	process.exit(run());
+try {
+	if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(__filename)) {
+		process.exit(run());
+	}
+} catch {
+	// Ignore path resolution failures when imported or invoked indirectly.
 }
