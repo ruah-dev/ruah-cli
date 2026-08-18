@@ -173,6 +173,35 @@ function verifyWorkspaceResolution(): void {
 
 verifyWorkspaceResolution();
 
+function verifyNestedCliDiscoversParentTool(): void {
+	const root = mkdtempSync(resolve(tmpdir(), "ruah-nested-"));
+	const optDir = resolve(root, "node_modules", "@ruah-dev", "opt");
+	mkdirSync(resolve(optDir, "dist"), { recursive: true });
+	writeFileSync(
+		resolve(optDir, "package.json"),
+		JSON.stringify({
+			name: "@ruah-dev/opt",
+			version: "0.1.0",
+			ruah: { namespace: "opt", description: "nested opt" },
+			bin: { "ruah-opt": "dist/cli.js" },
+		}),
+	);
+	writeFileSync(
+		resolve(optDir, "dist", "cli.js"),
+		"#!/usr/bin/env node\nconsole.log(['nested-opt', ...process.argv.slice(2)].join(' '));\n",
+	);
+
+	const result = spawnSync(process.execPath, [cliPath, "opt", "analyze", "--json"], {
+		encoding: "utf8",
+		cwd: root,
+		env: { ...process.env, RUAH_WORKSPACE: "" },
+	});
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout ?? "", /nested-opt analyze --json/);
+}
+
+verifyNestedCliDiscoversParentTool();
+
 const unknownCommand = runCli(["definitely-not-a-command"]);
 assert.equal(unknownCommand.status, 1, "Expected unknown commands to exit with status 1.");
 assert.match(

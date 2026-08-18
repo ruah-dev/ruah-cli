@@ -3,10 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/@ruah-dev/cli)](https://www.npmjs.com/package/@ruah-dev/cli)
 [![license](https://img.shields.io/npm/l/@ruah-dev/cli)](LICENSE)
 
-**Front door for the ruah 6-pool.** `ruah <tool> …` is identical to the
-standalone `ruah-<tool>` binary.
+**Front door for the ruah 6-pool.** Use `ruah opt analyze`, not `ruah-opt`.
 
-`ruah` is the top-level CLI for the ruah ecosystem. Install one package, get access to all ruah tools.
+Install **any** `@ruah-dev/*` tool and you get `ruah`. Install another tool later and `ruah` auto-detects it — no extra config.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ruah-dev/ruah-orch/main/.github/demo.gif" alt="ruah demo" width="100%" />
@@ -15,12 +14,14 @@ standalone `ruah-<tool>` binary.
 ## Install
 
 ```bash
-npm install -g @ruah-dev/cli
+npm install -g @ruah-dev/cli          # just the router
+npm install -g @ruah-dev/opt          # also installs `ruah`, then: ruah opt …
+npm install -g @ruah-dev/guard        # now `ruah guard` works too
 ```
 
-This installs the `ruah` command. Pool tools resolve from (1) an installed
-`@ruah-dev/<tool>`, then (2) a sibling `ruah-<tool>` checkout when a
-`.ruah-workspace` marker is present.
+Each tool depends on `@ruah-dev/cli`. Discovery walks `node_modules/@ruah-dev`,
+the CLI install tree, and the npm prefix, so a nested CLI still sees globally
+installed siblings.
 
 ```
 @ruah-dev/cli          <- `ruah <tool> …` router

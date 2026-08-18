@@ -14,10 +14,18 @@
 //   automatically available as `ruah <namespace> <command>`.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	type DiscoveredPackage,
+	discoverPackages,
+	type PackageJson,
+	readPackageJson,
+	resolveBinFromPackage,
+	resolveDiscoveredCli,
+} from "./discover.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,19 +37,6 @@ interface PackageEntry {
 	pkg: string;
 	description: string;
 	defaultBin: string;
-}
-
-interface RuahMeta {
-	namespace: string;
-	description?: string;
-}
-
-interface PackageJson {
-	version?: string;
-	name?: string;
-	description?: string;
-	bin?: string | Record<string, string>;
-	ruah?: RuahMeta;
 }
 
 interface InstalledPackage {
@@ -85,7 +80,7 @@ const KNOWN_PACKAGES: Record<string, PackageEntry> = {
 		defaultBin: "dist/cli.js",
 	},
 	conv: {
-		pkg: "@ruah-dev/conv-core",
+		pkg: "@ruah-dev/conv",
 		description: "API specs → agent-shaped tools",
 		defaultBin: "dist/cli.js",
 	},
@@ -95,10 +90,16 @@ const KNOWN_PACKAGES: Record<string, PackageEntry> = {
 		defaultBin: "dist/cli.js",
 	},
 	orch: {
-		pkg: "@ruah-dev/orch-core",
+		pkg: "@ruah-dev/orch",
 		description: "Multi-agent orchestration (optional)",
 		defaultBin: "dist/cli.js",
 	},
+};
+
+/** Extra npm names to try when the headline package isn't resolvable. */
+const PACKAGE_ALIASES: Record<string, string[]> = {
+	conv: ["@ruah-dev/conv-core"],
+	orch: ["@ruah-dev/orch-core"],
 };
 
 const WORKSPACE_FOLDERS: Record<string, string> = {
@@ -133,125 +134,87 @@ const packageCache = new Map<string, InstalledPackage | null>();
 // ── Package discovery ────────────────────────────────────────────────
 
 let discoveredPackages: Record<string, PackageEntry> | null = null;
+let discoveredInstalls: Map<string, DiscoveredPackage> | null = null;
+
+function getDiscoveredInstalls(): Map<string, DiscoveredPackage> {
+	if (!discoveredInstalls) {
+		discoveredInstalls = discoverPackages(resolve(__dirname, ".."), process.cwd());
+	}
+	return discoveredInstalls;
+}
 
 /**
- * Discover all @ruah-dev/* packages installed alongside this CLI.
- * Each package that has a "ruah" field with "namespace" in its package.json
- * is registered as a subcommand namespace.
- *
- * Known packages (like orch) are always included. Discovered packages
- * are merged on top — if a package declares a namespace that matches
- * a known package, the discovered metadata takes precedence.
+ * Known pool + any `@ruah-dev/*` package that declares `"ruah": { "namespace" }`.
+ * Scan covers cwd, the CLI install tree, and the npm prefix so a nested
+ * `opt/node_modules/@ruah-dev/cli` still sees globally installed siblings.
  */
 function getPackages(): Record<string, PackageEntry> {
 	if (discoveredPackages) return discoveredPackages;
 
 	const packages: Record<string, PackageEntry> = { ...KNOWN_PACKAGES };
-
-	try {
-		// The scope directory is @ruah-dev/ — two levels up from dist/cli.js
-		// __dirname = node_modules/@ruah-dev/cli/dist
-		// ..       = node_modules/@ruah-dev/cli
-		// ../..    = node_modules/@ruah-dev
-		const scopeDir = resolve(__dirname, "..", "..");
-
-		if (!existsSync(scopeDir)) {
-			discoveredPackages = packages;
-			return packages;
-		}
-
-		const entries = readdirSync(scopeDir, { withFileTypes: true });
-
-		for (const entry of entries) {
-			if (!entry.isDirectory() || entry.name === "cli") continue;
-
-			const pkgJsonPath = resolve(scopeDir, entry.name, "package.json");
-			if (!existsSync(pkgJsonPath)) continue;
-
-			const pkgJson = readPackageJson(pkgJsonPath);
-			if (!pkgJson?.ruah?.namespace) continue;
-
-			const ns = pkgJson.ruah.namespace;
-			if (!KNOWN_PACKAGES[ns]) continue;
-			packages[ns] = {
-				pkg: pkgJson.name ?? `@ruah-dev/${entry.name}`,
-				description: pkgJson.ruah.description ?? pkgJson.description ?? entry.name,
-				defaultBin: "dist/cli.js",
-			};
-		}
-	} catch {
-		// Discovery failed — use known packages only
+	for (const [ns, found] of getDiscoveredInstalls()) {
+		packages[ns] = {
+			pkg: found.pkg,
+			description: found.description,
+			defaultBin: found.bin,
+		};
 	}
-
 	discoveredPackages = packages;
 	return packages;
 }
 
 // ── Utilities ────────────────────────────────────────────────────────
 
-function readPackageJson(packageJsonPath: string): PackageJson | null {
+function getLocalPackageJson(): PackageJson | null {
+	return readPackageJson(resolve(__dirname, "..", "package.json"));
+}
+
+function resolveViaRequire(pkgName: string): InstalledPackage | null {
 	try {
-		return JSON.parse(readFileSync(packageJsonPath, "utf8")) as PackageJson;
+		const packageJsonPath = require.resolve(`${pkgName}/package.json`);
+		const packageJson = readPackageJson(packageJsonPath);
+		return packageJson ? { path: packageJsonPath, json: packageJson } : null;
 	} catch {
 		return null;
 	}
 }
 
-function getLocalPackageJson(): PackageJson | null {
-	return readPackageJson(resolve(__dirname, "..", "package.json"));
-}
-
-function getInstalledPackage(entry: PackageEntry): InstalledPackage | null {
+function getInstalledPackage(namespace: string, entry: PackageEntry): InstalledPackage | null {
 	const cached = packageCache.get(entry.pkg);
 	if (cached !== undefined) {
 		return cached;
 	}
 
-	try {
-		const packageJsonPath = require.resolve(`${entry.pkg}/package.json`);
+	const found = getDiscoveredInstalls().get(namespace);
+	if (found) {
+		const packageJsonPath = join(found.dir, "package.json");
 		const packageJson = readPackageJson(packageJsonPath);
-		const installed = packageJson
-			? {
-					path: packageJsonPath,
-					json: packageJson,
-				}
-			: null;
-		packageCache.set(entry.pkg, installed);
-		return installed;
-	} catch {
-		packageCache.set(entry.pkg, null);
-		return null;
-	}
-}
-
-function resolveBinPath(packageJson: PackageJson, fallbackPath: string): string {
-	if (typeof packageJson.bin === "string") {
-		return packageJson.bin;
-	}
-
-	if (packageJson.bin && typeof packageJson.bin === "object") {
-		const ruahBin = packageJson.bin.ruah;
-		if (typeof ruahBin === "string") {
-			return ruahBin;
-		}
-
-		const firstBin = Object.values(packageJson.bin).find(
-			(binPath): binPath is string => typeof binPath === "string",
-		);
-		if (firstBin) {
-			return firstBin;
+		if (packageJson) {
+			const installed = { path: packageJsonPath, json: packageJson };
+			packageCache.set(entry.pkg, installed);
+			return installed;
 		}
 	}
 
-	return fallbackPath;
+	const names = [entry.pkg, ...(PACKAGE_ALIASES[namespace] ?? [])];
+	for (const name of names) {
+		const installed = resolveViaRequire(name);
+		if (installed) {
+			packageCache.set(entry.pkg, installed);
+			return installed;
+		}
+	}
+
+	packageCache.set(entry.pkg, null);
+	return null;
 }
 
 function getVersion(): string {
 	return getLocalPackageJson()?.version ?? "unknown";
 }
 
-function getPackageVersion(entry: PackageEntry): string | null {
-	return getInstalledPackage(entry)?.json.version ?? null;
+function getPackageVersion(namespace: string, entry: PackageEntry): string | null {
+	return getInstalledPackage(namespace, entry)?.json.version ?? null;
 }
 
 export function findWorkspaceRoot(
@@ -306,9 +269,20 @@ export function resolveNamespace(
 		};
 	}
 
-	const installed = getInstalledPackage(entry);
+	const found = getDiscoveredInstalls().get(namespace);
+	if (found) {
+		const discoveredPath = resolveDiscoveredCli(found);
+		if (discoveredPath) {
+			if (options.debug) {
+				console.error(`ruah: ${namespace} → installed ${discoveredPath}`);
+			}
+			return { path: discoveredPath, source: "installed" };
+		}
+	}
+
+	const installed = getInstalledPackage(namespace, entry);
 	if (installed) {
-		const relativeCliPath = resolveBinPath(installed.json, entry.defaultBin);
+		const relativeCliPath = resolveBinFromPackage(installed.json, entry.defaultBin);
 		const cliPath = resolve(dirname(installed.path), relativeCliPath);
 		if (existsSync(cliPath)) {
 			if (options.debug) {
@@ -361,7 +335,7 @@ function printHelp(): void {
   ruah v${version} — multi-agent developer toolkit
 
   Usage:
-    ruah <tool> <command> [options]
+    ruah <tool> <command> [options]       ruah opt analyze   (not ruah-opt)
     ruah doctor [--json]                  Where each tool resolves from
 
   Tools:
@@ -392,7 +366,7 @@ ${foundationLines}
 	for (const ns of [...POOL_ORDER, ...FOUNDATION_ORDER]) {
 		const entry = getPackages()[ns];
 		if (!entry) continue;
-		const packageVersion = getPackageVersion(entry);
+		const packageVersion = getPackageVersion(ns, entry);
 		if (packageVersion) {
 			console.log(`    ${entry.pkg}  v${packageVersion}  ${entry.description}`);
 			continue;
@@ -410,7 +384,7 @@ function printVersion(): void {
 	console.log(`ruah v${version}`);
 
 	for (const [name, entry] of Object.entries(packages)) {
-		const packageVersion = getPackageVersion(entry);
+		const packageVersion = getPackageVersion(name, entry);
 		if (packageVersion) {
 			console.log(`  ${name}: v${packageVersion}`);
 			continue;
@@ -438,7 +412,7 @@ function printDoctor(json: boolean): number {
 				hint: message,
 			};
 		}
-		const version = entry ? getPackageVersion(entry) : null;
+		const version = entry ? getPackageVersion(ns, entry) : null;
 		return {
 			namespace: ns,
 			status: resolved.source,
