@@ -18,15 +18,15 @@ standalone `ruah-<tool>` binary.
 npm install -g @ruah-dev/cli
 ```
 
-This installs the `ruah` command and pulls in all packages:
+This installs the `ruah` command. Pool tools resolve from (1) an installed
+`@ruah-dev/<tool>`, then (2) a sibling `ruah-<tool>` checkout when a
+`.ruah-workspace` marker is present.
 
 ```
-@ruah-dev/cli               <- primary install target, provides `ruah`
-  ├── @ruah-dev/orch-core   <- orch implementation
-  └── @ruah-dev/conv-core   <- conv implementation
-
-@ruah-dev/orch              <- thin installer, installs `ruah` + orch core
-@ruah-dev/conv              <- thin installer, installs `ruah` + conv core
+@ruah-dev/cli          <- `ruah <tool> …` router
+  ├── guard verify opt watch eval conv
+  ├── schema           <- canonical types
+  └── orch             <- optional orchestration
 ```
 
 ## Usage
@@ -40,8 +40,9 @@ ruah task create api --files "src/api/**" --executor claude-code
 ruah workflow run .ruah/workflows/feature.md
 ruah status --json
 
-# Conversion tools
-ruah conv inspect petstore.yaml
+# Pool tools
+ruah guard check --cmd 'rm -rf /' --json
+ruah conv curate petstore.yaml
 ruah conv generate petstore.yaml --json
 ```
 
