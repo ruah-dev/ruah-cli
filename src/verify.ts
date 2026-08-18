@@ -136,9 +136,23 @@ assertSuccess(["--version"], "ruah v");
 assertSuccess(["--help"], "Packages:");
 assertSuccess(["--help"], "Tools:");
 assertSuccess(["--help"], "guard");
-assertSuccess(["orch", "--help"], "multi-agent orchestration");
-assertSuccess(["conv", "--help"], "ruah conv");
-assertSuccess(["task", "--help"], "Task subcommands:");
+
+function assertDelegatesOrMissing(namespace: string, expectedText: string): void {
+	const result = runCli([namespace, "--help"]);
+	if (result.status !== 0 && /not installed/.test(result.stderr)) {
+		return;
+	}
+	assert.equal(
+		result.status,
+		0,
+		`Expected ${namespace} --help to succeed when installed.\n${result.stderr}`,
+	);
+	assert.match(result.stdout, new RegExp(expectedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
+
+assertDelegatesOrMissing("orch", "multi-agent orchestration");
+assertDelegatesOrMissing("conv", "ruah conv");
+assertDelegatesOrMissing("task", "Task subcommands:");
 verifySymlinkEntrypoint();
 verifyPreinstallCleanup();
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2] - 2026-08-18
+
+### Fixed
+
+- Release tests no longer require orch/conv to be installed. The CLI
+  publishes as a router with zero runtime dependencies.
+
 ## [1.2.1] - 2026-08-18
 
 ### Changed
