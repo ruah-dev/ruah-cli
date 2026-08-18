@@ -16,7 +16,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,19 +53,63 @@ interface ExecError extends Error {
 	status?: number | null;
 }
 
-// ── Known packages (always listed, even if not installed) ────────────
+// ── Known packages (pool of six + foundation). Parked tools are gone. ─
+
+const POOL_ORDER = ["guard", "verify", "opt", "watch", "eval", "conv"] as const;
+const FOUNDATION_ORDER = ["schema", "orch"] as const;
 
 const KNOWN_PACKAGES: Record<string, PackageEntry> = {
-	orch: {
-		pkg: "@ruah-dev/orch-core",
-		description: "Multi-agent orchestration",
+	guard: {
+		pkg: "@ruah-dev/guard",
+		description: "Policies for agent tool calls",
+		defaultBin: "dist/cli.js",
+	},
+	verify: {
+		pkg: "@ruah-dev/verify",
+		description: "Definition of done as code",
+		defaultBin: "dist/cli.js",
+	},
+	opt: {
+		pkg: "@ruah-dev/opt",
+		description: "Token X-ray — where spend went",
+		defaultBin: "dist/cli.js",
+	},
+	watch: {
+		pkg: "@ruah-dev/watch",
+		description: "Static HTML replay of one session",
+		defaultBin: "dist/cli.js",
+	},
+	eval: {
+		pkg: "@ruah-dev/eval",
+		description: "Same task, N executors, receipts",
 		defaultBin: "dist/cli.js",
 	},
 	conv: {
 		pkg: "@ruah-dev/conv-core",
-		description: "Convert API specs to agent-ready tool surfaces",
+		description: "API specs → agent-shaped tools",
 		defaultBin: "dist/cli.js",
 	},
+	schema: {
+		pkg: "@ruah-dev/schema",
+		description: "Canonical Workflow / Task / Trace / Policy types",
+		defaultBin: "dist/cli.js",
+	},
+	orch: {
+		pkg: "@ruah-dev/orch-core",
+		description: "Multi-agent orchestration (optional)",
+		defaultBin: "dist/cli.js",
+	},
+};
+
+const WORKSPACE_FOLDERS: Record<string, string> = {
+	guard: "ruah-guard",
+	verify: "ruah-verify",
+	opt: "ruah-opt",
+	watch: "ruah-watch",
+	eval: "ruah-eval",
+	conv: "ruah-conv",
+	schema: "ruah-schema",
+	orch: "ruah-orch",
 };
 
 // ── Orch shortcuts — these commands delegate directly to orch ────────
@@ -77,7 +121,6 @@ const ORCH_SHORTCUTS = [
 	"setup",
 	"clean",
 	"config",
-	"doctor",
 	"status",
 	"demo",
 ] as const;
@@ -129,6 +172,7 @@ function getPackages(): Record<string, PackageEntry> {
 			if (!pkgJson?.ruah?.namespace) continue;
 
 			const ns = pkgJson.ruah.namespace;
+			if (!KNOWN_PACKAGES[ns]) continue;
 			packages[ns] = {
 				pkg: pkgJson.name ?? `@ruah-dev/${entry.name}`,
 				description: pkgJson.ruah.description ?? pkgJson.description ?? entry.name,
@@ -210,22 +254,87 @@ function getPackageVersion(entry: PackageEntry): string | null {
 	return getInstalledPackage(entry)?.json.version ?? null;
 }
 
-function resolvePackageCliPath(entry: PackageEntry): string {
+export function findWorkspaceRoot(
+	startDir: string = process.cwd(),
+	env: NodeJS.ProcessEnv = process.env,
+): string | null {
+	if (env.RUAH_WORKSPACE && env.RUAH_WORKSPACE.trim() !== "") {
+		return env.RUAH_WORKSPACE;
+	}
+	let current = startDir;
+	while (true) {
+		if (existsSync(join(current, ".ruah-workspace"))) {
+			return current;
+		}
+		const parent = dirname(current);
+		if (parent === current) break;
+		current = parent;
+	}
+	return null;
+}
+
+function resolveWorkspaceCli(namespace: string, workspaceRoot: string): string | null {
+	const folder = WORKSPACE_FOLDERS[namespace];
+	if (!folder) return null;
+	const candidates = [
+		join(workspaceRoot, folder, "dist", "cli.js"),
+		join(workspaceRoot, folder, "packages", "core", "dist", "cli.js"),
+	];
+	for (const candidate of candidates) {
+		if (existsSync(candidate)) return candidate;
+	}
+	const srcHint = join(workspaceRoot, folder);
+	if (existsSync(srcHint)) {
+		throw new Error(`found workspace copy at ${srcHint} — run \`npm run build\` in ${folder}`);
+	}
+	return null;
+}
+
+export type ResolveSource = "installed" | "workspace" | "missing";
+
+export function resolveNamespace(
+	namespace: string,
+	options: { cwd?: string; env?: NodeJS.ProcessEnv; debug?: boolean } = {},
+): { path: string; source: ResolveSource } | { path: null; source: "missing"; hint: string } {
+	const packages = getPackages();
+	const entry = packages[namespace];
+	if (!entry) {
+		return {
+			path: null,
+			source: "missing",
+			hint: `ruah ${namespace} is not a known tool. Try: ${POOL_ORDER.join(", ")}`,
+		};
+	}
+
 	const installed = getInstalledPackage(entry);
-	if (!installed) {
-		throw new Error(`${entry.pkg} is not installed`);
+	if (installed) {
+		const relativeCliPath = resolveBinPath(installed.json, entry.defaultBin);
+		const cliPath = resolve(dirname(installed.path), relativeCliPath);
+		if (existsSync(cliPath)) {
+			if (options.debug) {
+				console.error(`ruah: ${namespace} → installed ${cliPath}`);
+			}
+			return { path: cliPath, source: "installed" };
+		}
 	}
 
-	const relativeCliPath = resolveBinPath(installed.json, entry.defaultBin);
-	const cliPath = resolve(dirname(installed.path), relativeCliPath);
-
-	if (!existsSync(cliPath)) {
-		throw new Error(
-			`${entry.pkg} CLI entrypoint was not found at ${cliPath}. Reinstall the package or rebuild it before running ruah.`,
-		);
+	const root = findWorkspaceRoot(options.cwd ?? process.cwd(), options.env);
+	if (root) {
+		const workspaceCli = resolveWorkspaceCli(namespace, root);
+		if (workspaceCli) {
+			if (options.debug) {
+				console.error(`ruah: ${namespace} → workspace ${workspaceCli}`);
+			}
+			return { path: workspaceCli, source: "workspace" };
+		}
 	}
 
-	return cliPath;
+	const pkgName = entry.pkg.replace(/-core$/, "");
+	return {
+		path: null,
+		source: "missing",
+		hint: `ruah ${namespace} is not installed. npm i -g ${pkgName}`,
+	};
 }
 
 function isNamespace(command: string): boolean {
@@ -234,61 +343,60 @@ function isNamespace(command: string): boolean {
 
 // ── Output ───────────────────────────────────────────────────────────
 
+function lineFor(ns: string): string {
+	const packages = getPackages();
+	const entry = packages[ns];
+	if (!entry) return "";
+	const resolved = resolveNamespace(ns);
+	const mark = resolved.path ? "" : " (not installed)";
+	return `    ${ns.padEnd(12)}${entry.description}${mark}`;
+}
+
 function printHelp(): void {
 	const version = getVersion();
-	const packages = getPackages();
-
-	// Build namespace list dynamically
-	const namespaceLines = Object.entries(packages)
-		.map(([ns, entry]) => {
-			const installed = getInstalledPackage(entry);
-			const status = installed ? "" : " (not installed)";
-			return `    ${ns.padEnd(12)}${entry.description}${status}`;
-		})
-		.join("\n");
+	const toolLines = POOL_ORDER.map(lineFor).join("\n");
+	const foundationLines = FOUNDATION_ORDER.map(lineFor).join("\n");
 
 	console.log(`
   ruah v${version} — multi-agent developer toolkit
 
   Usage:
-    ruah <namespace> <command> [options]
-    ruah <command> [options]              (shorthand for ruah orch)
+    ruah <tool> <command> [options]
+    ruah doctor [--json]                  Where each tool resolves from
 
-  Namespaces:
-${namespaceLines}
+  Tools:
+${toolLines}
+
+  Foundation:
+${foundationLines}
 
   Shortcuts (delegated to ruah orch):
-    ruah init                   Initialize .ruah/ in a git repo
-    ruah task <subcommand>      Task management (create, start, done, merge, list, cancel)
-    ruah workflow <subcommand>  Workflow DAG execution (run, plan, explain, list, create)
-    ruah setup                  Register with AI agents
-    ruah status [--json]        Dashboard
-    ruah doctor [--json]        Validate repo health
-    ruah clean [--dry-run]      Remove stale tasks
-    ruah config                 Show resolved configuration
-    ruah demo [--fast]          Interactive demo
+    ruah init / task / workflow / status / clean / config / demo / setup
 
   Options:
     --help, -h       Show this help
     --version, -v    Show version
+    --debug          Print which bin path won
 
   Examples:
-    ruah orch task create api --files "src/api/**" --executor claude-code
-    ruah task create api --files "src/api/**"      # same thing (shorthand)
+    ruah guard check --cmd 'rm -rf /' --json
+    ruah verify run --json
+    ruah opt analyze ~/.claude/projects/<slug>/
+    ruah watch render --latest
+    ruah eval run spec.json --json
     ruah conv generate petstore.yaml --json
-    ruah workflow run .ruah/workflows/feature.md
-    ruah status --json
 
   Packages:
     @ruah-dev/cli   v${version}  (this CLI)`);
 
-	for (const entry of Object.values(packages)) {
+	for (const ns of [...POOL_ORDER, ...FOUNDATION_ORDER]) {
+		const entry = getPackages()[ns];
+		if (!entry) continue;
 		const packageVersion = getPackageVersion(entry);
 		if (packageVersion) {
 			console.log(`    ${entry.pkg}  v${packageVersion}  ${entry.description}`);
 			continue;
 		}
-
 		console.log(`    ${entry.pkg}  (not installed)  ${entry.description}`);
 	}
 
@@ -314,10 +422,55 @@ function printVersion(): void {
 
 // ── Delegation ───────────────────────────────────────────────────────
 
-function delegate(entry: PackageEntry, args: string[]): number {
+function printDoctor(json: boolean): number {
+	const rows = [...POOL_ORDER, ...FOUNDATION_ORDER].map((ns) => {
+		const entry = getPackages()[ns];
+		let resolved: ReturnType<typeof resolveNamespace>;
+		try {
+			resolved = resolveNamespace(ns);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			return {
+				namespace: ns,
+				status: "missing" as const,
+				version: null,
+				path: null,
+				hint: message,
+			};
+		}
+		const version = entry ? getPackageVersion(entry) : null;
+		return {
+			namespace: ns,
+			status: resolved.source,
+			version,
+			path: resolved.path,
+			hint: resolved.path ? null : "hint" in resolved ? resolved.hint : "missing",
+		};
+	});
+	if (json) {
+		console.log(JSON.stringify({ schemaVersion: "1", tools: rows }, null, 2));
+	} else {
+		console.log("ruah doctor");
+		for (const row of rows) {
+			const where = row.path ?? row.hint ?? "missing";
+			console.log(
+				`  ${row.namespace.padEnd(10)} ${row.status.padEnd(10)} ${row.version ?? "-"}  ${where}`,
+			);
+		}
+	}
+	return 0;
+}
+
+function delegate(entry: PackageEntry, args: string[], debug = false): number {
 	try {
-		const cliPath = resolvePackageCliPath(entry);
-		execFileSync(process.execPath, [cliPath, ...args], {
+		const namespace =
+			Object.entries(getPackages()).find(([, value]) => value.pkg === entry.pkg)?.[0] ?? "";
+		const resolved = resolveNamespace(namespace, { debug });
+		if (!resolved.path) {
+			console.error(`ruah: ${"hint" in resolved ? resolved.hint : "not installed"}`);
+			return 1;
+		}
+		execFileSync(process.execPath, [resolved.path, ...args], {
 			stdio: "inherit",
 			env: process.env,
 		});
@@ -337,6 +490,8 @@ function delegate(entry: PackageEntry, args: string[]): number {
 // ── Main ─────────────────────────────────────────────────────────────
 
 export function run(argv: string[] = process.argv.slice(2)): number {
+	const debug = argv.includes("--debug");
+
 	if (argv.length === 0 || HELP_FLAGS.has(argv[0])) {
 		printHelp();
 		return 0;
@@ -347,11 +502,15 @@ export function run(argv: string[] = process.argv.slice(2)): number {
 		return 0;
 	}
 
+	if (argv[0] === "doctor") {
+		return printDoctor(argv.includes("--json"));
+	}
+
 	const command = argv[0];
 	const packages = getPackages();
 
 	if (isNamespace(command)) {
-		return delegate(packages[command], argv.slice(1));
+		return delegate(packages[command], argv.slice(1), debug);
 	}
 
 	if (ORCH_SHORTCUT_SET.has(command)) {

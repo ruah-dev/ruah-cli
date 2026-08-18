@@ -134,11 +134,44 @@ function verifyPreinstallCleanup(): void {
 
 assertSuccess(["--version"], "ruah v");
 assertSuccess(["--help"], "Packages:");
+assertSuccess(["--help"], "Tools:");
+assertSuccess(["--help"], "guard");
 assertSuccess(["orch", "--help"], "multi-agent orchestration");
 assertSuccess(["conv", "--help"], "ruah conv");
 assertSuccess(["task", "--help"], "Task subcommands:");
 verifySymlinkEntrypoint();
 verifyPreinstallCleanup();
+
+const helpOut = runCli(["--help"]);
+assert.doesNotMatch(helpOut.stdout, /^\s+arch\s/m, "Parked tools must not appear in help");
+assert.doesNotMatch(helpOut.stdout, /^\s+obs\s/m, "Parked tools must not appear in help");
+
+const doctor = runCli(["doctor", "--json"]);
+assert.equal(doctor.status, 0, doctor.stderr);
+const doctorJson = JSON.parse(doctor.stdout) as {
+	tools: Array<{ namespace: string }>;
+};
+assert.ok(doctorJson.tools.some((t) => t.namespace === "guard"));
+assert.ok(!doctorJson.tools.some((t) => t.namespace === "arch"));
+
+function verifyWorkspaceResolution(): void {
+	const workspace = mkdtempSync(resolve(tmpdir(), "ruah-ws-"));
+	writeFileSync(resolve(workspace, ".ruah-workspace"), "ruah\n");
+	const stubDir = resolve(workspace, "ruah-guard", "dist");
+	mkdirSync(stubDir, { recursive: true });
+	writeFileSync(
+		resolve(stubDir, "cli.js"),
+		"#!/usr/bin/env node\nconsole.log(['stub', ...process.argv.slice(2)].join(' '));\n",
+	);
+	const result = spawnSync(process.execPath, [cliPath, "guard", "check", "--cmd", "x"], {
+		encoding: "utf8",
+		env: { ...process.env, RUAH_WORKSPACE: workspace },
+	});
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout ?? "", /stub check --cmd x/);
+}
+
+verifyWorkspaceResolution();
 
 const unknownCommand = runCli(["definitely-not-a-command"]);
 assert.equal(unknownCommand.status, 1, "Expected unknown commands to exit with status 1.");

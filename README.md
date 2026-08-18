@@ -3,7 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/@ruah-dev/cli)](https://www.npmjs.com/package/@ruah-dev/cli)
 [![license](https://img.shields.io/npm/l/@ruah-dev/cli)](LICENSE)
 
-**Multi-agent developer toolkit.**
+**Front door for the ruah 6-pool.** `ruah <tool> …` is identical to the
+standalone `ruah-<tool>` binary.
 
 `ruah` is the top-level CLI for the ruah ecosystem. Install one package, get access to all ruah tools.
 
@@ -48,8 +49,22 @@ ruah conv generate petstore.yaml --json
 
 | Namespace | Package | Description |
 |---|---|---|
-| `orch` | [@ruah-dev/orch](https://npmjs.com/package/@ruah-dev/orch) | Multi-agent orchestration — workspace isolation, file locking, DAG merges |
-| `conv` | [@ruah-dev/conv](https://npmjs.com/package/@ruah-dev/conv) | Convert API specs to agent-ready tool surfaces |
+| `guard` | [@ruah-dev/guard](https://npmjs.com/package/@ruah-dev/guard) | Policies for agent tool calls |
+| `verify` | [@ruah-dev/verify](https://npmjs.com/package/@ruah-dev/verify) | Definition of done as code |
+| `opt` | [@ruah-dev/opt](https://npmjs.com/package/@ruah-dev/opt) | Token X-ray |
+| `watch` | [@ruah-dev/watch](https://npmjs.com/package/@ruah-dev/watch) | Static session replay |
+| `eval` | [@ruah-dev/eval](https://npmjs.com/package/@ruah-dev/eval) | Same task, N executors |
+| `conv` | [@ruah-dev/conv](https://npmjs.com/package/@ruah-dev/conv) | API specs → agent tools |
+| `schema` | [@ruah-dev/schema](https://npmjs.com/package/@ruah-dev/schema) | Canonical types |
+| `orch` | [@ruah-dev/orch](https://npmjs.com/package/@ruah-dev/orch) | Orchestration (optional) |
+
+In this workspace, `ruah <tool>` resolves sibling `ruah-<tool>/dist/cli.js` when a `.ruah-workspace` marker (or `RUAH_WORKSPACE`) is present. Installed packages still win.
+
+```bash
+ruah doctor --json
+ruah guard check --cmd 'rm -rf /' --json
+ruah verify run --json
+```
 
 ## Orch Shortcuts
 
