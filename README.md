@@ -19,9 +19,9 @@ npm install -g @ruah-dev/opt          # also installs `ruah`, then: ruah opt …
 npm install -g @ruah-dev/guard        # now `ruah guard` works too
 ```
 
-Each tool depends on `@ruah-dev/cli`. Discovery walks `node_modules/@ruah-dev`,
-the CLI install tree, and the npm prefix, so a nested CLI still sees globally
-installed siblings.
+`@ruah-dev/cli` has **no runtime dependencies**. Each tool depends on the CLI.
+Discovery walks `node_modules/@ruah-dev`, the CLI install tree, and the npm
+prefix, so a nested CLI still sees globally installed siblings.
 
 ```
 @ruah-dev/cli          <- `ruah <tool> …` router

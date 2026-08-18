@@ -1,6 +1,6 @@
 {
 	"name": "@ruah-dev/cli",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Front door for the ruah 6-pool. Install once; `ruah <tool>` auto-detects every @ruah-dev package.",
 	"type": "module",
 	"bin": {
@@ -59,12 +59,11 @@
 	"engines": {
 		"node": ">=18.0.0"
 	},
-	"dependencies": {
-		"@ruah-dev/conv-core": "^0.2.0",
-		"@ruah-dev/orch-core": "file:../ruah-orch/packages/core"
-	},
+	"dependencies": {},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.10",
+		"@ruah-dev/conv-core": "^0.4.0",
+		"@ruah-dev/orch-core": "^1.1.0",
 		"@types/node": "^25.5.2",
 		"typescript": "^6.0.2"
 	}

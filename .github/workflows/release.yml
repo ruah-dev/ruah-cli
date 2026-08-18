@@ -18,18 +18,10 @@ jobs:
         with:
           path: ruah-cli
 
-      - uses: actions/checkout@v4
-        with:
-          repository: ruah-dev/ruah-orch
-          path: ruah-orch
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - run: npm ci
-        working-directory: ruah-orch/packages/core
 
       - run: npm ci
         working-directory: ruah-cli
@@ -62,11 +54,6 @@ jobs:
         with:
           path: ruah-cli
 
-      - uses: actions/checkout@v4
-        with:
-          repository: ruah-dev/ruah-orch
-          path: ruah-orch
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -74,37 +61,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
-        working-directory: ruah-orch/packages/core
-
-      - run: npm ci
         working-directory: ruah-cli
 
       - name: Build
         run: npm run build
-        working-directory: ruah-cli
-
-      - name: Wait for orch core package to be visible
-        run: |
-          VERSION="$(node -p "require('../ruah-orch/packages/core/package.json').version")"
-          for attempt in {1..20}; do
-            if npm view "@ruah-dev/orch-core@$VERSION" version >/dev/null 2>&1; then
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "Timed out waiting for @ruah-dev/orch-core@$VERSION to be available on npm."
-          exit 1
-        working-directory: ruah-cli
-
-      - name: Rewrite manifest for registry publish
-        run: |
-          ORCH_CORE_VERSION="$(node -p "require('../ruah-orch/packages/core/package.json').version")"
-          ORCH_CORE_VERSION="$ORCH_CORE_VERSION" node <<'EOF'
-          const fs = require("node:fs");
-          const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          packageJson.dependencies["@ruah-dev/orch-core"] = `^${process.env.ORCH_CORE_VERSION}`;
-          fs.writeFileSync("package.json", JSON.stringify(packageJson, null, "\t") + "\n");
-          EOF
         working-directory: ruah-cli
 
       - name: Publish with provenance

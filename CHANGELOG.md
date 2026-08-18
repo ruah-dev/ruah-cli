@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1] - 2026-08-18
+
+### Changed
+
+- CLI is a router only: dropped runtime deps on `@ruah-dev/orch-core` and
+  `@ruah-dev/conv-core`. Install those packages (or any other `@ruah-dev/*`
+  tool) separately; `ruah` auto-detects them.
+- Release workflow no longer waits for an unpublished orch-core version.
+
 ## [1.2.0] - 2026-08-18
 
 ### Added
