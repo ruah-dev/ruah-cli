@@ -4,3 +4,4 @@ dist-test/
 bin/
 *.tgz
 .DS_Store
+.claude/
