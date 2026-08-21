@@ -1,7 +1,13 @@
 # ruah-cli — Deep Build Plan
 
 > Read first: `../GROK_BUILD_PLAN.md` (order & ground rules), `../ENGINEERING_STANDARDS.md` (how to write code & tests).
-> Package: `@ruah-dev/cli` · Binary: `ruah` · State: **works, needs pool alignment**
+> Package: `@ruah-dev/cli` · Binary: `ruah` · State: **shipped v1.2.2**
+>
+> **Status 2026-08-22.** W1–W4 are in source: pool-six registry, workspace
+> sibling resolution (`.ruah-workspace` / `RUAH_WORKSPACE`), `ruah doctor`,
+> installed > workspace. Tests skip orch/conv if not installed. Remaining:
+> npm publish (`NPM_TOKEN` cannot write `@ruah-dev`; GitHub install path is
+> `github:ruah-dev/ruah-cli#v1.2.2`).
 
 ## 0. Product requirement (the one that matters)
 
