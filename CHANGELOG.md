@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `--help` / `doctor` no longer crash when a workspace package is library-only
+  (no `bin`, e.g. `@ruah-dev/schema`). Those packages report as `library`
+  instead of a missing build. Direct-run errors are no longer swallowed by the
+  path-resolution catch.
+
 ## [1.2.2] - 2026-08-18
 
 ### Fixed

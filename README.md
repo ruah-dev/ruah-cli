@@ -15,13 +15,13 @@ Install **any** `@ruah-dev/*` tool and you get `ruah`. Install another tool late
 
 ```bash
 npm install -g @ruah-dev/cli          # just the router
-npm install -g @ruah-dev/opt          # also installs `ruah`, then: ruah opt …
-npm install -g @ruah-dev/guard        # now `ruah guard` works too
+npm install -g @ruah-dev/cli @ruah-dev/opt   # then: ruah opt …
+npm install -g @ruah-dev/guard        # now `ruah guard` works too (with cli installed)
 ```
 
-`@ruah-dev/cli` has **no runtime dependencies**. Each tool depends on the CLI.
-Discovery walks `node_modules/@ruah-dev`, the CLI install tree, and the npm
-prefix, so a nested CLI still sees globally installed siblings.
+`@ruah-dev/cli` has **no runtime dependencies**. Install tools alongside it
+(`npm i -g @ruah-dev/cli @ruah-dev/opt`); discovery walks `node_modules/@ruah-dev`,
+the CLI install tree, and the npm prefix so a nested CLI still sees siblings.
 
 ```
 @ruah-dev/cli          <- `ruah <tool> …` router

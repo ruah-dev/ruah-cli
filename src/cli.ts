@@ -239,26 +239,45 @@ export function findWorkspaceRoot(
 function resolveWorkspaceCli(namespace: string, workspaceRoot: string): string | null {
 	const folder = WORKSPACE_FOLDERS[namespace];
 	if (!folder) return null;
+	const pkgDir = join(workspaceRoot, folder);
 	const candidates = [
-		join(workspaceRoot, folder, "dist", "cli.js"),
-		join(workspaceRoot, folder, "packages", "core", "dist", "cli.js"),
+		join(pkgDir, "dist", "cli.js"),
+		join(pkgDir, "packages", "core", "dist", "cli.js"),
 	];
 	for (const candidate of candidates) {
 		if (existsSync(candidate)) return candidate;
 	}
-	const srcHint = join(workspaceRoot, folder);
-	if (existsSync(srcHint)) {
-		throw new Error(`found workspace copy at ${srcHint} — run \`npm run build\` in ${folder}`);
+	if (!existsSync(pkgDir)) return null;
+
+	// Library-only packages (e.g. @ruah-dev/schema) have no bin — not a missing build.
+	const packageJson = readPackageJson(join(pkgDir, "package.json"));
+	if (!packageJson?.bin) {
+		return null;
 	}
-	return null;
+	throw new Error(`found workspace copy at ${pkgDir} — run \`npm run build\` in ${folder}`);
 }
 
-export type ResolveSource = "installed" | "workspace" | "missing";
+function isLibraryOnlyPackage(
+	namespace: string,
+	workspaceRoot: string | null,
+	installed: InstalledPackage | null,
+): boolean {
+	if (installed && !installed.json.bin) return true;
+	if (!workspaceRoot) return false;
+	const folder = WORKSPACE_FOLDERS[namespace];
+	if (!folder) return false;
+	const packageJson = readPackageJson(join(workspaceRoot, folder, "package.json"));
+	return Boolean(packageJson && !packageJson.bin);
+}
+
+export type ResolveSource = "installed" | "workspace" | "library" | "missing";
 
 export function resolveNamespace(
 	namespace: string,
 	options: { cwd?: string; env?: NodeJS.ProcessEnv; debug?: boolean } = {},
-): { path: string; source: ResolveSource } | { path: null; source: "missing"; hint: string } {
+):
+	| { path: string; source: ResolveSource }
+	| { path: null; source: "missing" | "library"; hint: string } {
 	const packages = getPackages();
 	const entry = packages[namespace];
 	if (!entry) {
@@ -303,6 +322,14 @@ export function resolveNamespace(
 		}
 	}
 
+	if (isLibraryOnlyPackage(namespace, root, installed)) {
+		return {
+			path: null,
+			source: "library",
+			hint: `${entry.pkg} is a library (no CLI) — import it from Node`,
+		};
+	}
+
 	const pkgName = entry.pkg.replace(/-core$/, "");
 	return {
 		path: null,
@@ -322,7 +349,11 @@ function lineFor(ns: string): string {
 	const entry = packages[ns];
 	if (!entry) return "";
 	const resolved = resolveNamespace(ns);
-	const mark = resolved.path ? "" : " (not installed)";
+	const mark = resolved.path
+		? ""
+		: resolved.source === "library"
+			? " (library)"
+			: " (not installed)";
 	return `    ${ns.padEnd(12)}${entry.description}${mark}`;
 }
 
@@ -502,10 +533,14 @@ export function run(argv: string[] = process.argv.slice(2)): number {
 	return 1;
 }
 
+let isDirectRun = false;
 try {
-	if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(__filename)) {
-		process.exit(run());
-	}
+	isDirectRun =
+		Boolean(process.argv[1]) &&
+		realpathSync(resolve(process.argv[1])) === realpathSync(__filename);
 } catch {
 	// Ignore path resolution failures when imported or invoked indirectly.
+}
+if (isDirectRun) {
+	process.exit(run());
 }
